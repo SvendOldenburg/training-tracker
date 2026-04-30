@@ -18,15 +18,6 @@ function fmtSplit(secs) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function parseTime(str) {
-  if (!str || !str.includes(':')) return null;
-  const parts = str.split(':');
-  if (parts.length !== 2) return null;
-  const m = parseInt(parts[0], 10);
-  const s = parseInt(parts[1], 10);
-  if (isNaN(m) || isNaN(s) || s >= 60) return null;
-  return m * 60 + s;
-}
 
 export async function renderRower(container) {
   const sessions = await db.rower_sessions.orderBy('id').reverse().limit(10).toArray();
@@ -57,17 +48,27 @@ export async function renderRower(container) {
 
           <div class="form-row mt-3">
             <div class="form-group mb-0">
-              <label class="form-label">Time (m:ss)</label>
-              <input class="form-input" type="text" name="time"
-                placeholder="20:00" id="timeInput" inputmode="numeric">
+              <label class="form-label">Time (m : ss)</label>
+              <div class="time-pair">
+                <input class="form-input time-part" type="number" name="time_m"
+                  min="0" max="99" placeholder="20" id="timeMins">
+                <span class="time-colon">:</span>
+                <input class="form-input time-part" type="number" name="time_s"
+                  min="0" max="59" placeholder="00" id="timeSecs">
+              </div>
             </div>
             <div class="form-group mb-0">
-              <label class="form-label">Split /500m</label>
-              <input class="form-input" type="text" name="split"
-                placeholder="2:00" id="splitDisplay" readonly>
+              <label class="form-label">Split /500m (m : ss)</label>
+              <div class="time-pair">
+                <input class="form-input time-part" type="number" name="split_m"
+                  min="0" max="9" placeholder="2" id="splitMins">
+                <span class="time-colon">:</span>
+                <input class="form-input time-part" type="number" name="split_s"
+                  min="0" max="59" placeholder="00" id="splitSecs">
+              </div>
             </div>
           </div>
-          <div class="form-hint">Split auto-calculates from distance + time</div>
+          <div class="form-hint">Split auto-calculates from distance + time, or enter manually</div>
 
           <button class="btn btn-primary mt-4" type="submit">Save Session</button>
         </form>
@@ -94,38 +95,59 @@ export async function renderRower(container) {
     </div>
   `;
 
-  const form       = document.getElementById('rowerForm');
-  const distInput  = document.getElementById('distInput');
-  const timeInput  = document.getElementById('timeInput');
-  const splitDisp  = document.getElementById('splitDisplay');
+  const form      = document.getElementById('rowerForm');
+  const distInput = document.getElementById('distInput');
+  const timeMins  = document.getElementById('timeMins');
+  const timeSecs  = document.getElementById('timeSecs');
+  const splitMins = document.getElementById('splitMins');
+  const splitSecs = document.getElementById('splitSecs');
 
-  let splitSecs = null;
+  function getTimeSecs() {
+    const m = parseInt(timeMins.value, 10);
+    const s = parseInt(timeSecs.value, 10);
+    if (isNaN(m) && isNaN(s)) return null;
+    return (isNaN(m) ? 0 : m) * 60 + (isNaN(s) ? 0 : s);
+  }
+
+  function getSplitSecs() {
+    const m = parseInt(splitMins.value, 10);
+    const s = parseInt(splitSecs.value, 10);
+    if (isNaN(m) && isNaN(s)) return null;
+    return (isNaN(m) ? 0 : m) * 60 + (isNaN(s) ? 0 : s);
+  }
+
+  function setSplitFields(totalSecs) {
+    const m = Math.floor(totalSecs / 60);
+    const s = Math.round(totalSecs % 60);
+    splitMins.value = m;
+    splitSecs.value = String(s).padStart(2, '0');
+  }
 
   function calcSplit() {
     const dist  = parseFloat(distInput.value);
-    const total = parseTime(timeInput.value);
+    const total = getTimeSecs();
     if (dist > 0 && total > 0) {
-      splitSecs           = (total / dist) * 500;
-      splitDisp.value     = fmtSplit(splitSecs);
-    } else {
-      splitSecs       = null;
-      splitDisp.value = '';
+      setSplitFields((total / dist) * 500);
     }
   }
 
   distInput.addEventListener('input', calcSplit);
-  timeInput.addEventListener('input', calcSplit);
+  timeMins.addEventListener('input', calcSplit);
+  timeSecs.addEventListener('input', calcSplit);
 
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const fd = new FormData(form);
 
+    const durationS = getTimeSecs();
+    const splitS    = getSplitSecs();
+
     await db.rower_sessions.add({
       date:        fd.get('date'),
       stroke_rate: parseFloat(fd.get('stroke_rate')) || null,
       distance_m:  parseFloat(fd.get('distance')) || null,
-      duration_s:  parseTime(fd.get('time')),
-      split_s:     splitSecs,
+      duration_s:  durationS,
+      split_s:     splitS,
     });
 
     renderRower(container);
