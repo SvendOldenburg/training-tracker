@@ -31,7 +31,7 @@ function collection(name) {
 
   return {
     async list(limit = 500) {
-      const r = await pbReq('GET', `${base}?sort=-created&perPage=${limit}`);
+      const r = await pbReq('GET', `${base}?sort=-session_date&perPage=${limit}`);
       return r.items.map(fromPB);
     },
 
@@ -44,13 +44,13 @@ function collection(name) {
     },
 
     async last() {
-      const r = await pbReq('GET', `${base}?sort=-created&perPage=1`);
+      const r = await pbReq('GET', `${base}?sort=-session_date&perPage=1`);
       return r.items.length ? fromPB(r.items[0]) : null;
     },
 
     async lastOfType(type) {
       const filter = encodeURIComponent(`type="${type}"`);
-      const r = await pbReq('GET', `${base}?sort=-created&perPage=1&filter=${filter}`);
+      const r = await pbReq('GET', `${base}?sort=-session_date&perPage=1&filter=${filter}`);
       return r.items.length ? fromPB(r.items[0]) : null;
     },
 
