@@ -2,7 +2,9 @@ import { renderHome }       from './views/home.js';
 import { renderWorkout }    from './views/workout.js';
 import { renderRower }      from './views/rower.js';
 import { renderKettlebell } from './views/kettlebell.js';
-import { renderBodyweight } from './views/bodyweight.js';
+import { renderBody }       from './views/body.js';
+import { renderBarbell }    from './views/barbell.js';
+import { renderDumbbell }   from './views/dumbbell.js';
 import { renderHistory }    from './views/history.js';
 
 const container = document.getElementById('view');
@@ -12,7 +14,9 @@ const routes = {
   '#workout':     renderWorkout,
   '#rower':       renderRower,
   '#kettlebell':  renderKettlebell,
-  '#bodyweight':  renderBodyweight,
+  '#body':        renderBody,
+  '#barbell':     renderBarbell,
+  '#dumbbell':    renderDumbbell,
   '#history':     renderHistory,
 };
 

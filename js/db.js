@@ -10,6 +10,17 @@ db.version(1).stores({
   settings: 'key',
 });
 
+db.version(2).stores({
+  strength_sessions: '++id, date, type',
+  bodyweight: '++id, date',
+  rower_sessions: '++id, date',
+  kettlebell_sessions: '++id, date, exercise',
+  barbell_sessions: '++id, date, exercise',
+  dumbbell_sessions: '++id, date, exercise',
+  body_measurements: '++id, date',
+  settings: 'key',
+});
+
 export const WORKOUTS = {
   A: [
     { name: 'Squat',       sets: 5, reps: 5, increment_kg: 2.5 },
@@ -29,6 +40,33 @@ export const KB_EXERCISES = [
   'Snatch',
   'Clean & Jerk',
   'Shoulder Press',
+  'OH Row',
+  'TH Row',
+  'Gorilla Row',
+  'Lunges',
+  'Reverse Lunges',
+  'Clean',
+  'Goblet Squat',
+  'Deadlift',
+  'Turkish Get-Up',
+  'Windmill',
+];
+
+export const BB_EXERCISES = [
+  'Incline Bench Press',
+  'Curls',
+];
+
+export const DB_EXERCISES = [
+  'DB Bench Press',
+  'DB Incline Bench Press',
+  'Pullovers',
+  'DB Overhead Press',
+  'Lateral Raises',
+  'Rear Delt Flyes',
+  'Hammer Curls',
+  'Overhead Tricep Extensions',
+  'DB Skull Crushers',
 ];
 
 export async function getSetting(key, defaultVal) {

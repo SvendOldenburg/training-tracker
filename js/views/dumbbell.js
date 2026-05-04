@@ -1,4 +1,4 @@
-import { db, KB_EXERCISES } from '../db.js';
+import { db, DB_EXERCISES } from '../db.js';
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -6,17 +6,16 @@ function today() {
 
 let setIdx = 1;
 
-export async function renderKettlebell(container) {
-  const sessions = await db.kettlebell_sessions.orderBy('id').reverse().limit(15).toArray();
-
+export async function renderDumbbell(container) {
+  const sessions = await db.dumbbell_sessions.orderBy('id').reverse().limit(15).toArray();
   setIdx = 1;
 
   container.innerHTML = `
     <div class="view">
-      <div class="view-title">Kettlebell</div>
+      <div class="view-title">Dumbbell</div>
 
       <div class="card">
-        <form id="kbForm" autocomplete="off">
+        <form id="dbForm" autocomplete="off">
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Date</label>
@@ -25,16 +24,16 @@ export async function renderKettlebell(container) {
             <div class="form-group">
               <label class="form-label">Exercise</label>
               <select class="form-select form-select-sm" name="exercise">
-                ${KB_EXERCISES.map(e => `<option value="${e}">${e}</option>`).join('')}
+                ${DB_EXERCISES.map(e => `<option value="${e}">${e}</option>`).join('')}
               </select>
             </div>
           </div>
 
           <div class="form-label">Sets</div>
-          <div id="kbSets" class="set-builder">
+          <div id="dbSets" class="set-builder">
             ${makeSetRow(0)}
           </div>
-          <button type="button" class="add-set-btn" id="addSetBtn">+ Add set</button>
+          <button type="button" class="add-set-btn" id="dbAddSetBtn">+ Add set</button>
 
           <button class="btn btn-primary mt-4" type="submit">Save Session</button>
         </form>
@@ -42,8 +41,8 @@ export async function renderKettlebell(container) {
 
       <div class="section-label">Recent sessions</div>
       ${sessions.length === 0
-        ? `<div class="empty-state">No kettlebell sessions yet.</div>`
-        : `<div class="card mb-0" id="kbHistory">
+        ? `<div class="empty-state">No dumbbell sessions yet.</div>`
+        : `<div class="card mb-0" id="dbHistory">
             ${sessions.map(s => renderSessionRow(s)).join('')}
           </div>`
       }
@@ -88,7 +87,7 @@ function renderEditRow(s) {
       <div class="form-group">
         <label class="form-label">Exercise</label>
         <select class="form-select form-select-sm edit-exercise">
-          ${KB_EXERCISES.map(e => `<option value="${e}" ${e === s.exercise ? 'selected' : ''}>${e}</option>`).join('')}
+          ${DB_EXERCISES.map(e => `<option value="${e}" ${e === s.exercise ? 'selected' : ''}>${e}</option>`).join('')}
         </select>
       </div>
       <div class="form-label">Sets</div>
@@ -102,7 +101,7 @@ function renderEditRow(s) {
 }
 
 function wireHistory(container, sessions) {
-  const hist = container.querySelector('#kbHistory');
+  const hist = container.querySelector('#dbHistory');
   if (!hist) return;
 
   hist.addEventListener('click', async e => {
@@ -110,8 +109,8 @@ function wireHistory(container, sessions) {
 
     if (e.target.classList.contains('delete-btn')) {
       if (!confirm('Delete this session?')) return;
-      await db.kettlebell_sessions.delete(id);
-      renderKettlebell(container);
+      await db.dumbbell_sessions.delete(id);
+      renderDumbbell(container);
       return;
     }
 
@@ -120,7 +119,6 @@ function wireHistory(container, sessions) {
       if (!s) return;
       const row = hist.querySelector(`.history-item[data-id="${id}"]`);
       if (row) row.outerHTML = renderEditRow(s);
-      wireEditRowRemoveBtns(hist);
       return;
     }
 
@@ -143,70 +141,50 @@ function wireHistory(container, sessions) {
         if (w > 0 && reps > 0) sets.push({ weight_kg: w, reps });
       });
       if (sets.length === 0) return;
-      await db.kettlebell_sessions.update(rid, { exercise, sets });
-      renderKettlebell(container);
+      await db.dumbbell_sessions.update(rid, { exercise, sets });
+      renderDumbbell(container);
       return;
     }
 
     if (e.target.classList.contains('remove-set-btn')) {
       const setRow = e.target.closest('.set-row');
       const builder = setRow?.closest('.edit-sets');
-      if (builder && builder.querySelectorAll('.set-row').length > 1) {
-        setRow.remove();
-      }
+      if (builder && builder.querySelectorAll('.set-row').length > 1) setRow.remove();
     }
-  });
-}
-
-function wireEditRowRemoveBtns(hist) {
-  hist.querySelectorAll('.edit-row .remove-set-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const builder = btn.closest('.edit-sets');
-      if (builder && builder.querySelectorAll('.set-row').length > 1) {
-        btn.closest('.set-row').remove();
-      }
-    });
   });
 }
 
 function wireForm(container) {
-  const setsEl = document.getElementById('kbSets');
+  const setsEl = document.getElementById('dbSets');
 
   setsEl.querySelector('.remove-set-btn').addEventListener('click', e => {
-    if (setsEl.querySelectorAll('.set-row').length > 1) {
-      e.target.closest('.set-row').remove();
-    }
+    if (setsEl.querySelectorAll('.set-row').length > 1) e.target.closest('.set-row').remove();
   });
 
-  document.getElementById('addSetBtn').addEventListener('click', () => {
-    const row = document.createElement('div');
-    row.innerHTML = makeSetRow(setIdx++);
-    const el = row.firstElementChild;
+  document.getElementById('dbAddSetBtn').addEventListener('click', () => {
+    const div = document.createElement('div');
+    div.innerHTML = makeSetRow(setIdx++);
+    const el = div.firstElementChild;
     setsEl.appendChild(el);
     el.querySelector('.remove-set-btn').addEventListener('click', ev => {
-      if (setsEl.querySelectorAll('.set-row').length > 1) {
-        ev.target.closest('.set-row').remove();
-      }
+      if (setsEl.querySelectorAll('.set-row').length > 1) ev.target.closest('.set-row').remove();
     });
   });
 
-  document.getElementById('kbForm').addEventListener('submit', async e => {
+  document.getElementById('dbForm').addEventListener('submit', async e => {
     e.preventDefault();
     const form     = e.target;
     const exercise = form.querySelector('[name="exercise"]').value;
     const date     = form.querySelector('[name="date"]').value;
-
     const sets = [];
     setsEl.querySelectorAll('.set-row').forEach(row => {
       const w = parseFloat(row.querySelector('[data-field="weight"]')?.value);
       const r = parseInt(row.querySelector('[data-field="reps"]')?.value, 10);
       if (w > 0 && r > 0) sets.push({ weight_kg: w, reps: r });
     });
-
     if (sets.length === 0) return;
-
-    await db.kettlebell_sessions.add({ date, exercise, sets });
-    renderKettlebell(container);
+    await db.dumbbell_sessions.add({ date, exercise, sets });
+    renderDumbbell(container);
   });
 }
 
