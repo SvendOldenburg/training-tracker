@@ -1,4 +1,5 @@
-import { db, KB_EXERCISES } from '../db.js';
+import { api } from '../api.js';
+import { KB_EXERCISES } from '../db.js';
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -7,8 +8,7 @@ function today() {
 let setIdx = 1;
 
 export async function renderKettlebell(container) {
-  const sessions = await db.kettlebell_sessions.orderBy('id').reverse().limit(15).toArray();
-
+  const sessions = await api.kettlebell_sessions.list(15);
   setIdx = 1;
 
   container.innerHTML = `
@@ -75,10 +75,8 @@ function renderEditRow(s) {
   const setsHtml = s.sets.map((st, i) => `
     <div class="set-row">
       <span class="set-row-num">Set ${i + 1}</span>
-      <input class="form-input" type="number" step="0.5" min="0"
-        placeholder="kg" data-field="weight" value="${st.weight_kg}">
-      <input class="form-input" type="number" min="1"
-        placeholder="reps" data-field="reps" value="${st.reps}">
+      <input class="form-input" type="number" step="0.5" min="0" placeholder="kg" data-field="weight" value="${st.weight_kg}">
+      <input class="form-input" type="number" min="1" placeholder="reps" data-field="reps" value="${st.reps}">
       <button type="button" class="remove-set-btn" title="Remove">&times;</button>
     </div>
   `).join('');
@@ -106,11 +104,11 @@ function wireHistory(container, sessions) {
   if (!hist) return;
 
   hist.addEventListener('click', async e => {
-    const id = Number(e.target.dataset.id);
+    const id = e.target.dataset.id;
 
     if (e.target.classList.contains('delete-btn')) {
       if (!confirm('Delete this session?')) return;
-      await db.kettlebell_sessions.delete(id);
+      await api.kettlebell_sessions.delete(id);
       renderKettlebell(container);
       return;
     }
@@ -120,21 +118,19 @@ function wireHistory(container, sessions) {
       if (!s) return;
       const row = hist.querySelector(`.history-item[data-id="${id}"]`);
       if (row) row.outerHTML = renderEditRow(s);
-      wireEditRowRemoveBtns(hist);
       return;
     }
 
     if (e.target.classList.contains('cancel-edit-btn')) {
       const row = e.target.closest('.edit-row');
-      const rid = Number(row.dataset.id);
-      const s = sessions.find(x => x.id === rid);
+      const s = sessions.find(x => x.id === row.dataset.id);
       if (s) row.outerHTML = renderSessionRow(s);
       return;
     }
 
     if (e.target.classList.contains('save-edit-btn')) {
       const row = e.target.closest('.edit-row');
-      const rid = Number(e.target.dataset.id);
+      const rid = e.target.dataset.id;
       const exercise = row.querySelector('.edit-exercise').value;
       const sets = [];
       row.querySelectorAll('.set-row').forEach(r => {
@@ -143,7 +139,7 @@ function wireHistory(container, sessions) {
         if (w > 0 && reps > 0) sets.push({ weight_kg: w, reps });
       });
       if (sets.length === 0) return;
-      await db.kettlebell_sessions.update(rid, { exercise, sets });
+      await api.kettlebell_sessions.update(rid, { exercise, sets });
       renderKettlebell(container);
       return;
     }
@@ -151,21 +147,8 @@ function wireHistory(container, sessions) {
     if (e.target.classList.contains('remove-set-btn')) {
       const setRow = e.target.closest('.set-row');
       const builder = setRow?.closest('.edit-sets');
-      if (builder && builder.querySelectorAll('.set-row').length > 1) {
-        setRow.remove();
-      }
+      if (builder && builder.querySelectorAll('.set-row').length > 1) setRow.remove();
     }
-  });
-}
-
-function wireEditRowRemoveBtns(hist) {
-  hist.querySelectorAll('.edit-row .remove-set-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const builder = btn.closest('.edit-sets');
-      if (builder && builder.querySelectorAll('.set-row').length > 1) {
-        btn.closest('.set-row').remove();
-      }
-    });
   });
 }
 
@@ -173,20 +156,16 @@ function wireForm(container) {
   const setsEl = document.getElementById('kbSets');
 
   setsEl.querySelector('.remove-set-btn').addEventListener('click', e => {
-    if (setsEl.querySelectorAll('.set-row').length > 1) {
-      e.target.closest('.set-row').remove();
-    }
+    if (setsEl.querySelectorAll('.set-row').length > 1) e.target.closest('.set-row').remove();
   });
 
   document.getElementById('addSetBtn').addEventListener('click', () => {
-    const row = document.createElement('div');
-    row.innerHTML = makeSetRow(setIdx++);
-    const el = row.firstElementChild;
+    const div = document.createElement('div');
+    div.innerHTML = makeSetRow(setIdx++);
+    const el = div.firstElementChild;
     setsEl.appendChild(el);
     el.querySelector('.remove-set-btn').addEventListener('click', ev => {
-      if (setsEl.querySelectorAll('.set-row').length > 1) {
-        ev.target.closest('.set-row').remove();
-      }
+      if (setsEl.querySelectorAll('.set-row').length > 1) ev.target.closest('.set-row').remove();
     });
   });
 
@@ -195,17 +174,14 @@ function wireForm(container) {
     const form     = e.target;
     const exercise = form.querySelector('[name="exercise"]').value;
     const date     = form.querySelector('[name="date"]').value;
-
     const sets = [];
     setsEl.querySelectorAll('.set-row').forEach(row => {
       const w = parseFloat(row.querySelector('[data-field="weight"]')?.value);
       const r = parseInt(row.querySelector('[data-field="reps"]')?.value, 10);
       if (w > 0 && r > 0) sets.push({ weight_kg: w, reps: r });
     });
-
     if (sets.length === 0) return;
-
-    await db.kettlebell_sessions.add({ date, exercise, sets });
+    await api.kettlebell_sessions.add({ date, exercise, sets });
     renderKettlebell(container);
   });
 }
@@ -214,10 +190,8 @@ function makeSetRow(idx) {
   return `
     <div class="set-row">
       <span class="set-row-num">Set ${idx + 1}</span>
-      <input class="form-input" type="number" step="0.5" min="0"
-        placeholder="kg" data-field="weight">
-      <input class="form-input" type="number" min="1"
-        placeholder="reps" data-field="reps">
+      <input class="form-input" type="number" step="0.5" min="0" placeholder="kg" data-field="weight">
+      <input class="form-input" type="number" min="1" placeholder="reps" data-field="reps">
       <button type="button" class="remove-set-btn" title="Remove">&times;</button>
     </div>
   `;

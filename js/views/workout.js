@@ -1,4 +1,5 @@
-import { db, WORKOUTS, getSetting, getLastOfType } from '../db.js';
+import { WORKOUTS } from '../db.js';
+import { api, getSetting } from '../api.js';
 import { show as showTimer } from '../timer.js';
 
 let session = null;
@@ -55,8 +56,8 @@ function buildSession(type, lastA, lastB) {
 }
 
 function render(container, lastA, lastB) {
-  const s        = session;
-  const allDone  = s.exercises.every(ex => ex.sets.every(st => st.completed));
+  const s       = session;
+  const allDone = s.exercises.every(ex => ex.sets.every(st => st.completed));
 
   container.innerHTML = `
     <div class="view">
@@ -112,7 +113,6 @@ function render(container, lastA, lastB) {
     </div>
   `;
 
-  // Type picker
   container.querySelectorAll('.type-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       if (btn.dataset.type === session.type) return;
@@ -123,17 +123,15 @@ function render(container, lastA, lastB) {
     });
   });
 
-  // Weight inputs
   container.querySelectorAll('.weight-input').forEach(input => {
     input.addEventListener('change', () => {
       const ei = Number(input.dataset.ei);
       session.exercises[ei].weight_kg = parseFloat(input.value) || 0;
-      session.exercises[ei].suggestion = null; // user overrode
+      session.exercises[ei].suggestion = null;
       saveDraft(session);
     });
   });
 
-  // Set buttons
   container.querySelectorAll('.set-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const ei  = Number(btn.dataset.ei);
@@ -154,9 +152,8 @@ function render(container, lastA, lastB) {
     });
   });
 
-  // Save
   document.getElementById('saveBtn')?.addEventListener('click', async () => {
-    await db.strength_sessions.add({
+    await api.strength_sessions.add({
       date: session.date,
       type: session.type,
       notes: '',
@@ -171,7 +168,6 @@ function render(container, lastA, lastB) {
     render(container, lastA, lastB);
   });
 
-  // Reset
   document.getElementById('resetBtn')?.addEventListener('click', () => {
     if (!confirm('Reset this workout?')) return;
     session = buildSession(session.type, lastA, lastB);
@@ -182,9 +178,9 @@ function render(container, lastA, lastB) {
 
 export async function renderWorkout(container) {
   const [lastSession, lastA, lastB] = await Promise.all([
-    db.strength_sessions.orderBy('id').last(),
-    getLastOfType('A'),
-    getLastOfType('B'),
+    api.strength_sessions.last(),
+    api.strength_sessions.lastOfType('A'),
+    api.strength_sessions.lastOfType('B'),
   ]);
 
   const draft = loadDraft();

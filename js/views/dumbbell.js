@@ -1,4 +1,5 @@
-import { db, DB_EXERCISES } from '../db.js';
+import { api } from '../api.js';
+import { DB_EXERCISES } from '../db.js';
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -7,7 +8,7 @@ function today() {
 let setIdx = 1;
 
 export async function renderDumbbell(container) {
-  const sessions = await db.dumbbell_sessions.orderBy('id').reverse().limit(15).toArray();
+  const sessions = await api.dumbbell_sessions.list(15);
   setIdx = 1;
 
   container.innerHTML = `
@@ -30,11 +31,8 @@ export async function renderDumbbell(container) {
           </div>
 
           <div class="form-label">Sets</div>
-          <div id="dbSets" class="set-builder">
-            ${makeSetRow(0)}
-          </div>
+          <div id="dbSets" class="set-builder">${makeSetRow(0)}</div>
           <button type="button" class="add-set-btn" id="dbAddSetBtn">+ Add set</button>
-
           <button class="btn btn-primary mt-4" type="submit">Save Session</button>
         </form>
       </div>
@@ -74,10 +72,8 @@ function renderEditRow(s) {
   const setsHtml = s.sets.map((st, i) => `
     <div class="set-row">
       <span class="set-row-num">Set ${i + 1}</span>
-      <input class="form-input" type="number" step="0.5" min="0"
-        placeholder="kg" data-field="weight" value="${st.weight_kg}">
-      <input class="form-input" type="number" min="1"
-        placeholder="reps" data-field="reps" value="${st.reps}">
+      <input class="form-input" type="number" step="0.5" min="0" placeholder="kg" data-field="weight" value="${st.weight_kg}">
+      <input class="form-input" type="number" min="1" placeholder="reps" data-field="reps" value="${st.reps}">
       <button type="button" class="remove-set-btn" title="Remove">&times;</button>
     </div>
   `).join('');
@@ -105,11 +101,11 @@ function wireHistory(container, sessions) {
   if (!hist) return;
 
   hist.addEventListener('click', async e => {
-    const id = Number(e.target.dataset.id);
+    const id = e.target.dataset.id;
 
     if (e.target.classList.contains('delete-btn')) {
       if (!confirm('Delete this session?')) return;
-      await db.dumbbell_sessions.delete(id);
+      await api.dumbbell_sessions.delete(id);
       renderDumbbell(container);
       return;
     }
@@ -124,15 +120,14 @@ function wireHistory(container, sessions) {
 
     if (e.target.classList.contains('cancel-edit-btn')) {
       const row = e.target.closest('.edit-row');
-      const rid = Number(row.dataset.id);
-      const s = sessions.find(x => x.id === rid);
+      const s = sessions.find(x => x.id === row.dataset.id);
       if (s) row.outerHTML = renderSessionRow(s);
       return;
     }
 
     if (e.target.classList.contains('save-edit-btn')) {
       const row = e.target.closest('.edit-row');
-      const rid = Number(e.target.dataset.id);
+      const rid = e.target.dataset.id;
       const exercise = row.querySelector('.edit-exercise').value;
       const sets = [];
       row.querySelectorAll('.set-row').forEach(r => {
@@ -141,7 +136,7 @@ function wireHistory(container, sessions) {
         if (w > 0 && reps > 0) sets.push({ weight_kg: w, reps });
       });
       if (sets.length === 0) return;
-      await db.dumbbell_sessions.update(rid, { exercise, sets });
+      await api.dumbbell_sessions.update(rid, { exercise, sets });
       renderDumbbell(container);
       return;
     }
@@ -183,7 +178,7 @@ function wireForm(container) {
       if (w > 0 && r > 0) sets.push({ weight_kg: w, reps: r });
     });
     if (sets.length === 0) return;
-    await db.dumbbell_sessions.add({ date, exercise, sets });
+    await api.dumbbell_sessions.add({ date, exercise, sets });
     renderDumbbell(container);
   });
 }
@@ -192,10 +187,8 @@ function makeSetRow(idx) {
   return `
     <div class="set-row">
       <span class="set-row-num">Set ${idx + 1}</span>
-      <input class="form-input" type="number" step="0.5" min="0"
-        placeholder="kg" data-field="weight">
-      <input class="form-input" type="number" min="1"
-        placeholder="reps" data-field="reps">
+      <input class="form-input" type="number" step="0.5" min="0" placeholder="kg" data-field="weight">
+      <input class="form-input" type="number" min="1" placeholder="reps" data-field="reps">
       <button type="button" class="remove-set-btn" title="Remove">&times;</button>
     </div>
   `;

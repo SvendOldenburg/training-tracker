@@ -1,4 +1,5 @@
-import { db, BB_EXERCISES } from '../db.js';
+import { api } from '../api.js';
+import { BB_EXERCISES } from '../db.js';
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -7,7 +8,7 @@ function today() {
 let setIdx = 1;
 
 export async function renderBarbell(container) {
-  const sessions = await db.barbell_sessions.orderBy('id').reverse().limit(15).toArray();
+  const sessions = await api.barbell_sessions.list(15);
   setIdx = 1;
 
   container.innerHTML = `
@@ -30,11 +31,8 @@ export async function renderBarbell(container) {
           </div>
 
           <div class="form-label">Sets</div>
-          <div id="bbSets" class="set-builder">
-            ${makeSetRow(0)}
-          </div>
+          <div id="bbSets" class="set-builder">${makeSetRow(0)}</div>
           <button type="button" class="add-set-btn" id="bbAddSetBtn">+ Add set</button>
-
           <button class="btn btn-primary mt-4" type="submit">Save Session</button>
         </form>
       </div>
@@ -43,14 +41,14 @@ export async function renderBarbell(container) {
       ${sessions.length === 0
         ? `<div class="empty-state">No barbell sessions yet.</div>`
         : `<div class="card mb-0" id="bbHistory">
-            ${sessions.map(s => renderSessionRow(s, BB_EXERCISES)).join('')}
+            ${sessions.map(s => renderSessionRow(s)).join('')}
           </div>`
       }
     </div>
   `;
 
-  wireForm(container, 'bbForm', 'bbSets', 'bbAddSetBtn', db.barbell_sessions, () => renderBarbell(container));
-  wireHistory(container, sessions, 'bbHistory', BB_EXERCISES, db.barbell_sessions, () => renderBarbell(container));
+  wireForm(container);
+  wireHistory(container, sessions);
 }
 
 function renderSessionRow(s) {
@@ -70,14 +68,12 @@ function renderSessionRow(s) {
   `;
 }
 
-function renderEditRow(s, exercises) {
+function renderEditRow(s) {
   const setsHtml = s.sets.map((st, i) => `
     <div class="set-row">
       <span class="set-row-num">Set ${i + 1}</span>
-      <input class="form-input" type="number" step="0.5" min="0"
-        placeholder="kg" data-field="weight" value="${st.weight_kg}">
-      <input class="form-input" type="number" min="1"
-        placeholder="reps" data-field="reps" value="${st.reps}">
+      <input class="form-input" type="number" step="0.5" min="0" placeholder="kg" data-field="weight" value="${st.weight_kg}">
+      <input class="form-input" type="number" min="1" placeholder="reps" data-field="reps" value="${st.reps}">
       <button type="button" class="remove-set-btn" title="Remove">&times;</button>
     </div>
   `).join('');
@@ -87,7 +83,7 @@ function renderEditRow(s, exercises) {
       <div class="form-group">
         <label class="form-label">Exercise</label>
         <select class="form-select edit-exercise">
-          ${exercises.map(e => `<option value="${e}" ${e === s.exercise ? 'selected' : ''}>${e}</option>`).join('')}
+          ${BB_EXERCISES.map(e => `<option value="${e}" ${e === s.exercise ? 'selected' : ''}>${e}</option>`).join('')}
         </select>
       </div>
       <div class="form-label">Sets</div>
@@ -100,17 +96,17 @@ function renderEditRow(s, exercises) {
   `;
 }
 
-function wireHistory(container, sessions, histId, exercises, table, refresh) {
-  const hist = container.querySelector(`#${histId}`);
+function wireHistory(container, sessions) {
+  const hist = container.querySelector('#bbHistory');
   if (!hist) return;
 
   hist.addEventListener('click', async e => {
-    const id = Number(e.target.dataset.id);
+    const id = e.target.dataset.id;
 
     if (e.target.classList.contains('delete-btn')) {
       if (!confirm('Delete this session?')) return;
-      await table.delete(id);
-      refresh();
+      await api.barbell_sessions.delete(id);
+      renderBarbell(container);
       return;
     }
 
@@ -118,21 +114,20 @@ function wireHistory(container, sessions, histId, exercises, table, refresh) {
       const s = sessions.find(x => x.id === id);
       if (!s) return;
       const row = hist.querySelector(`.history-item[data-id="${id}"]`);
-      if (row) row.outerHTML = renderEditRow(s, exercises);
+      if (row) row.outerHTML = renderEditRow(s);
       return;
     }
 
     if (e.target.classList.contains('cancel-edit-btn')) {
       const row = e.target.closest('.edit-row');
-      const rid = Number(row.dataset.id);
-      const s = sessions.find(x => x.id === rid);
+      const s = sessions.find(x => x.id === row.dataset.id);
       if (s) row.outerHTML = renderSessionRow(s);
       return;
     }
 
     if (e.target.classList.contains('save-edit-btn')) {
       const row = e.target.closest('.edit-row');
-      const rid = Number(e.target.dataset.id);
+      const rid = e.target.dataset.id;
       const exercise = row.querySelector('.edit-exercise').value;
       const sets = [];
       row.querySelectorAll('.set-row').forEach(r => {
@@ -141,8 +136,8 @@ function wireHistory(container, sessions, histId, exercises, table, refresh) {
         if (w > 0 && reps > 0) sets.push({ weight_kg: w, reps });
       });
       if (sets.length === 0) return;
-      await table.update(rid, { exercise, sets });
-      refresh();
+      await api.barbell_sessions.update(rid, { exercise, sets });
+      renderBarbell(container);
       return;
     }
 
@@ -154,14 +149,14 @@ function wireHistory(container, sessions, histId, exercises, table, refresh) {
   });
 }
 
-function wireForm(container, formId, setsId, addBtnId, table, refresh) {
-  const setsEl = document.getElementById(setsId);
+function wireForm(container) {
+  const setsEl = document.getElementById('bbSets');
 
   setsEl.querySelector('.remove-set-btn').addEventListener('click', e => {
     if (setsEl.querySelectorAll('.set-row').length > 1) e.target.closest('.set-row').remove();
   });
 
-  document.getElementById(addBtnId).addEventListener('click', () => {
+  document.getElementById('bbAddSetBtn').addEventListener('click', () => {
     const div = document.createElement('div');
     div.innerHTML = makeSetRow(setIdx++);
     const el = div.firstElementChild;
@@ -171,7 +166,7 @@ function wireForm(container, formId, setsId, addBtnId, table, refresh) {
     });
   });
 
-  document.getElementById(formId).addEventListener('submit', async e => {
+  document.getElementById('bbForm').addEventListener('submit', async e => {
     e.preventDefault();
     const form     = e.target;
     const exercise = form.querySelector('[name="exercise"]').value;
@@ -183,8 +178,8 @@ function wireForm(container, formId, setsId, addBtnId, table, refresh) {
       if (w > 0 && r > 0) sets.push({ weight_kg: w, reps: r });
     });
     if (sets.length === 0) return;
-    await table.add({ date, exercise, sets });
-    refresh();
+    await api.barbell_sessions.add({ date, exercise, sets });
+    renderBarbell(container);
   });
 }
 
@@ -192,10 +187,8 @@ function makeSetRow(idx) {
   return `
     <div class="set-row">
       <span class="set-row-num">Set ${idx + 1}</span>
-      <input class="form-input" type="number" step="0.5" min="0"
-        placeholder="kg" data-field="weight">
-      <input class="form-input" type="number" min="1"
-        placeholder="reps" data-field="reps">
+      <input class="form-input" type="number" step="0.5" min="0" placeholder="kg" data-field="weight">
+      <input class="form-input" type="number" min="1" placeholder="reps" data-field="reps">
       <button type="button" class="remove-set-btn" title="Remove">&times;</button>
     </div>
   `;

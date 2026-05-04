@@ -1,4 +1,4 @@
-import { db } from '../db.js';
+import { api } from '../api.js';
 
 let ChartJS = null;
 
@@ -24,8 +24,8 @@ const MEASURES = [
 
 export async function renderBody(container) {
   const [allWeight, allMeasure] = await Promise.all([
-    db.bodyweight.orderBy('date').toArray(),
-    db.body_measurements.orderBy('date').toArray(),
+    api.bodyweight.listAsc(),
+    api.body_measurements.listAsc(),
   ]);
 
   const recentWeight  = [...allWeight].reverse().slice(0, 30);
@@ -33,14 +33,12 @@ export async function renderBody(container) {
   const chartWeight   = allWeight.slice(-30);
   const chartMeasure  = allMeasure.slice(-30);
 
-  const lastW = recentWeight[0];
   const lastM = recentMeasure[0];
 
   container.innerHTML = `
     <div class="view">
       <div class="view-title">Body</div>
 
-      <!-- Weight log -->
       <div class="section-label">Body Weight</div>
       <div class="card">
         <form id="bwForm" autocomplete="off">
@@ -79,7 +77,6 @@ export async function renderBody(container) {
           </div>`
       }
 
-      <!-- Measurements log -->
       <div class="section-label" style="margin-top:24px">Measurements</div>
       <div class="card">
         <form id="measureForm" autocomplete="off">
@@ -132,23 +129,21 @@ export async function renderBody(container) {
     </div>
   `;
 
-  // Weight form
   document.getElementById('bwForm').addEventListener('submit', async e => {
     e.preventDefault();
     const form   = e.target;
     const date   = form.querySelector('[name="date"]').value;
     const weight = parseFloat(form.querySelector('[name="weight"]').value);
     if (!weight) return;
-    const existing = await db.bodyweight.where('date').equals(date).first();
+    const existing = await api.bodyweight.byDate(date);
     if (existing) {
-      await db.bodyweight.update(existing.id, { weight_kg: weight });
+      await api.bodyweight.update(existing.id, { weight_kg: weight });
     } else {
-      await db.bodyweight.add({ date, weight_kg: weight });
+      await api.bodyweight.add({ date, weight_kg: weight });
     }
     renderBody(container);
   });
 
-  // Measurement form
   document.getElementById('measureForm').addEventListener('submit', async e => {
     e.preventDefault();
     const form = e.target;
@@ -159,11 +154,11 @@ export async function renderBody(container) {
       if (!isNaN(v) && v > 0) record[m.key] = v;
     });
     if (Object.keys(record).length <= 1) return;
-    const existing = await db.body_measurements.where('date').equals(date).first();
+    const existing = await api.body_measurements.byDate(date);
     if (existing) {
-      await db.body_measurements.update(existing.id, record);
+      await api.body_measurements.update(existing.id, record);
     } else {
-      await db.body_measurements.add(record);
+      await api.body_measurements.add(record);
     }
     renderBody(container);
   });

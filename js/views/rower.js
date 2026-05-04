@@ -1,4 +1,4 @@
-import { db } from '../db.js';
+import { api } from '../api.js';
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -24,7 +24,7 @@ function secsToMins(secs) {
 }
 
 export async function renderRower(container) {
-  const sessions = await db.rower_sessions.orderBy('id').reverse().limit(10).toArray();
+  const sessions = await api.rower_sessions.list(10);
 
   container.innerHTML = `
     <div class="view">
@@ -40,13 +40,11 @@ export async function renderRower(container) {
           <div class="form-row">
             <div class="form-group mb-0">
               <label class="form-label">Stroke rate (s/m)</label>
-              <input class="form-input" type="number" name="stroke_rate"
-                min="1" max="60" placeholder="24">
+              <input class="form-input" type="number" name="stroke_rate" min="1" max="60" placeholder="24">
             </div>
             <div class="form-group mb-0">
               <label class="form-label">Distance (m)</label>
-              <input class="form-input" type="number" name="distance"
-                min="1" placeholder="5000" id="distInput">
+              <input class="form-input" type="number" name="distance" min="1" placeholder="5000" id="distInput">
             </div>
           </div>
 
@@ -54,21 +52,17 @@ export async function renderRower(container) {
             <div class="form-group mb-0">
               <label class="form-label">Time (m : ss)</label>
               <div class="time-pair">
-                <input class="form-input time-part" type="number" name="time_m"
-                  min="0" max="99" placeholder="20" id="timeMins">
+                <input class="form-input time-part" type="number" name="time_m" min="0" max="99" placeholder="20" id="timeMins">
                 <span class="time-colon">:</span>
-                <input class="form-input time-part" type="number" name="time_s"
-                  min="0" max="59" placeholder="00" id="timeSecs">
+                <input class="form-input time-part" type="number" name="time_s" min="0" max="59" placeholder="00" id="timeSecs">
               </div>
             </div>
             <div class="form-group mb-0">
               <label class="form-label">Split /500m (m : ss)</label>
               <div class="time-pair">
-                <input class="form-input time-part" type="number" name="split_m"
-                  min="0" max="9" placeholder="2" id="splitMins">
+                <input class="form-input time-part" type="number" name="split_m" min="0" max="9" placeholder="2" id="splitMins">
                 <span class="time-colon">:</span>
-                <input class="form-input time-part" type="number" name="split_s"
-                  min="0" max="59" placeholder="00" id="splitSecs">
+                <input class="form-input time-part" type="number" name="split_s" min="0" max="59" placeholder="00" id="splitSecs">
               </div>
             </div>
           </div>
@@ -159,11 +153,11 @@ function wireHistory(container, sessions) {
   if (!hist) return;
 
   hist.addEventListener('click', async e => {
-    const id = Number(e.target.dataset.id);
+    const id = e.target.dataset.id;
 
     if (e.target.classList.contains('delete-btn')) {
       if (!confirm('Delete this session?')) return;
-      await db.rower_sessions.delete(id);
+      await api.rower_sessions.delete(id);
       renderRower(container);
       return;
     }
@@ -178,7 +172,7 @@ function wireHistory(container, sessions) {
 
     if (e.target.classList.contains('cancel-edit-btn')) {
       const row = e.target.closest('.edit-row');
-      const rid = Number(row.dataset.id);
+      const rid = row.dataset.id;
       const s = sessions.find(x => x.id === rid);
       if (s) row.outerHTML = renderSessionRow(s);
       return;
@@ -186,23 +180,17 @@ function wireHistory(container, sessions) {
 
     if (e.target.classList.contains('save-edit-btn')) {
       const row = e.target.closest('.edit-row');
-      const rid = Number(e.target.dataset.id);
-      const dist = parseFloat(row.querySelector('.edit-dist').value) || null;
+      const rid = e.target.dataset.id;
+      const dist   = parseFloat(row.querySelector('.edit-dist').value) || null;
       const stroke = parseFloat(row.querySelector('.edit-stroke').value) || null;
       const tm = parseInt(row.querySelector('.edit-tm').value, 10);
       const ts = parseInt(row.querySelector('.edit-ts').value, 10);
       const sm = parseInt(row.querySelector('.edit-sm').value, 10);
       const ss = parseInt(row.querySelector('.edit-ss').value, 10);
-      const durS = (!isNaN(tm) || !isNaN(ts)) ? (isNaN(tm) ? 0 : tm) * 60 + (isNaN(ts) ? 0 : ts) : null;
-      const splS = (!isNaN(sm) || !isNaN(ss)) ? (isNaN(sm) ? 0 : sm) * 60 + (isNaN(ss) ? 0 : ss) : null;
-      await db.rower_sessions.update(rid, {
-        distance_m: dist,
-        stroke_rate: stroke,
-        duration_s: durS,
-        split_s: splS,
-      });
+      const durS = (!isNaN(tm) || !isNaN(ts)) ? (isNaN(tm)?0:tm)*60 + (isNaN(ts)?0:ts) : null;
+      const splS = (!isNaN(sm) || !isNaN(ss)) ? (isNaN(sm)?0:sm)*60 + (isNaN(ss)?0:ss) : null;
+      await api.rower_sessions.update(rid, { distance_m: dist, stroke_rate: stroke, duration_s: durS, split_s: splS });
       renderRower(container);
-      return;
     }
   });
 }
@@ -219,21 +207,19 @@ function wireForm(container) {
     const m = parseInt(timeMins.value, 10);
     const s = parseInt(timeSecs.value, 10);
     if (isNaN(m) && isNaN(s)) return null;
-    return (isNaN(m) ? 0 : m) * 60 + (isNaN(s) ? 0 : s);
+    return (isNaN(m)?0:m)*60 + (isNaN(s)?0:s);
   }
 
   function getSplitSecs() {
     const m = parseInt(splitMins.value, 10);
     const s = parseInt(splitSecs.value, 10);
     if (isNaN(m) && isNaN(s)) return null;
-    return (isNaN(m) ? 0 : m) * 60 + (isNaN(s) ? 0 : s);
+    return (isNaN(m)?0:m)*60 + (isNaN(s)?0:s);
   }
 
   function setSplitFields(totalSecs) {
-    const m = Math.floor(totalSecs / 60);
-    const s = Math.round(totalSecs % 60);
-    splitMins.value = m;
-    splitSecs.value = String(s).padStart(2, '0');
+    splitMins.value = Math.floor(totalSecs / 60);
+    splitSecs.value = String(Math.round(totalSecs % 60)).padStart(2, '0');
   }
 
   function calcSplit() {
@@ -249,7 +235,7 @@ function wireForm(container) {
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const fd = new FormData(form);
-    await db.rower_sessions.add({
+    await api.rower_sessions.add({
       date:        fd.get('date'),
       stroke_rate: parseFloat(fd.get('stroke_rate')) || null,
       distance_m:  parseFloat(fd.get('distance')) || null,

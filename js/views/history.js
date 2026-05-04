@@ -1,4 +1,4 @@
-import { db } from '../db.js';
+import { api } from '../api.js';
 
 let ChartJS     = null;
 let chartInst   = null;
@@ -18,15 +18,14 @@ async function getChart() {
 
 function getCutoff(range) {
   const d = new Date();
-  if (range === '4W') { d.setDate(d.getDate() - 28);    return d.toISOString().slice(0, 10); }
-  if (range === '3M') { d.setMonth(d.getMonth() - 3);   return d.toISOString().slice(0, 10); }
+  if (range === '4W') { d.setDate(d.getDate() - 28);  return d.toISOString().slice(0, 10); }
+  if (range === '3M') { d.setMonth(d.getMonth() - 3); return d.toISOString().slice(0, 10); }
   return null;
 }
 
 async function getChartData(tab, cutoff) {
   if (tab === 'bodyweight') {
-    let entries = await db.bodyweight.orderBy('date').toArray();
-    if (cutoff) entries = entries.filter(e => e.date >= cutoff);
+    const entries = await api.bodyweight.listAsc(cutoff);
     return {
       labels: entries.map(e => e.date.slice(5)),
       values: entries.map(e => e.weight_kg),
@@ -35,8 +34,7 @@ async function getChartData(tab, cutoff) {
   }
 
   if (tab === 'rower') {
-    let sessions = await db.rower_sessions.orderBy('date').toArray();
-    if (cutoff) sessions = sessions.filter(s => s.date >= cutoff);
+    const sessions = await api.rower_sessions.listAsc(cutoff);
     return {
       labels: sessions.map(s => s.date.slice(5)),
       values: sessions.map(s => s.split_s ? +s.split_s.toFixed(1) : null),
@@ -45,13 +43,10 @@ async function getChartData(tab, cutoff) {
     };
   }
 
-  // Strength lift
-  let sessions = await db.strength_sessions.orderBy('date').toArray();
-  if (cutoff) sessions = sessions.filter(s => s.date >= cutoff);
-
+  const sessions = await api.strength_sessions.listAsc(cutoff);
   const points = [];
   sessions.forEach(s => {
-    const ex = s.exercises.find(e => e.name === tab);
+    const ex = s.exercises?.find(e => e.name === tab);
     if (ex) points.push({ date: s.date, weight: ex.weight_kg });
   });
 
@@ -91,13 +86,10 @@ async function renderChart(container) {
   const chartEl = document.getElementById('historyChart');
   if (!chartEl) return;
 
-  // PR stat
   const statsEl = container.querySelector('#historyStats');
   const nonNull = data.values.filter(v => v != null);
   if (statsEl && nonNull.length > 0) {
-    const best = data.lower
-      ? Math.min(...nonNull)
-      : Math.max(...nonNull);
+    const best = data.lower ? Math.min(...nonNull) : Math.max(...nonNull);
     const bestLabel = data.lower ? 'Best split' : 'PR';
     statsEl.innerHTML = `
       <div class="card pr-card" style="margin-bottom:20px">
@@ -145,8 +137,7 @@ export async function renderHistory(container) {
 
       <div class="chart-tabs" id="chartTabs">
         ${LIFTS.map(l => `
-          <button class="chart-tab ${l === activeTab ? 'active' : ''}"
-            data-lift="${l}">${l}</button>
+          <button class="chart-tab ${l === activeTab ? 'active' : ''}" data-lift="${l}">${l}</button>
         `).join('')}
         <button class="chart-tab ${activeTab === 'bodyweight' ? 'active' : ''}"
           data-lift="bodyweight">Body Weight</button>
@@ -156,8 +147,7 @@ export async function renderHistory(container) {
 
       <div class="range-tabs" id="rangeTabs">
         ${['4W', '3M', 'All'].map(r => `
-          <button class="range-tab ${r === activeRange ? 'active' : ''}"
-            data-range="${r}">${r}</button>
+          <button class="range-tab ${r === activeRange ? 'active' : ''}" data-range="${r}">${r}</button>
         `).join('')}
       </div>
 

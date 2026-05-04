@@ -1,4 +1,4 @@
-import { db } from '../db.js';
+import { api } from '../api.js';
 
 function fmtSplit(secs) {
   if (!secs) return '--';
@@ -9,9 +9,9 @@ function fmtSplit(secs) {
 
 export async function renderHome(container) {
   const [lastSession, lastRower, recentSessions] = await Promise.all([
-    db.strength_sessions.orderBy('id').last(),
-    db.rower_sessions.orderBy('id').last(),
-    db.strength_sessions.orderBy('id').reverse().limit(5).toArray(),
+    api.strength_sessions.last(),
+    api.rower_sessions.last(),
+    api.strength_sessions.list(5),
   ]);
 
   const nextType = lastSession ? (lastSession.type === 'A' ? 'B' : 'A') : 'A';
